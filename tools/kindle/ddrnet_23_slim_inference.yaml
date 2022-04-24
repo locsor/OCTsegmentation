@@ -1,0 +1,82 @@
+input_channel: 3
+infrence_channels: 193
+
+depth_multiple: 1.0
+width_multiple: 1.0
+
+custom_module_paths: ["layers"]
+
+backbone:
+  [
+    [-1, 1, BasicBlock, [64, 2, 2, 1, False, False, False, 1]], #conv1 0
+
+    [-1, 1, Layer, [64, 1, 2, 1, False]], #layer1 1
+
+    [-1, 1, nn.ReLU, [], {inplace: False}], #2
+    [-1, 1, Layer, [128, 1, 2, 2, False]], #layer2 3
+    [-1, 1, Upsample, [128, 32]], #4 new
+
+    [-1, 1, nn.ReLU, [], {inplace: False}], #5
+    [-1, 1, Layer, [256, 1, 2, 2, False]], #layer3 6
+
+    [4, 1, nn.ReLU, [], {inplace: False}], #7
+    [-1, 1, Layer, [128, 1, 2, 1, False]], #layer3_ 8
+
+    [-1, 1, nn.ReLU, [], {inplace: False}], #9
+    [-1, 1, Downsample, [256, 3, 2, 1, 1]], #down3 10
+    [[6, 10], 1, Sum, []], #11
+
+    [6, 1, nn.ReLU, [], {inplace: False}], #12
+    [-1, 1, Compression, [128, 4, 193]], #compression3 13
+    [[8, 13], 1, Sum, []], #14
+
+    [11, 1, nn.ReLU, [], {inplace: False}], #15
+    [-1, 1, Layer, [512, 1, 2, 2, False]], #layer4 16
+
+    [14, 1, nn.ReLU, [], {inplace: False}], #17
+    [-1, 1, Layer, [128, 1, 2, 1, False]], #layer4_ 18
+
+    [-1, 1, nn.ReLU, [], {inplace: False}], #19
+    [-1, 1, BasicBlock, [512, 2, 2, 1, False, False, False, 2]], #down4 20
+    [[16, 20], 1, Sum, []], #21
+
+    [16, 1, nn.ReLU, [], {inplace: False}], #22
+    [-1, 1, Compression, [128, 8, 193]], #compression4 23
+    [[18, 23], 1, Sum, []], #24
+
+    [-1, 1, nn.ReLU, [], {inplace: False}], #25
+    [-1, 1, Layer, [256, 2, 1, 1, True]], #layer5_ 27
+
+    [21, 1, nn.ReLU, [], {inplace: False}], #28
+    [-1, 1, Layer, [1024, 2, 1, 2, True]], #layer5 28
+
+    #DAPPM
+    [28, 1, DAPPMProcess, [128, 1, 1, 0]], #29
+
+    [28, 1, DAPPMScale, [128, 5, 2, 2, True, False]], #30
+    [[29,30], 1, Sum, []], #31
+    [28, 1, DAPPMProcess, [128, 3, 1, 1]], #32
+
+    [28, 1, DAPPMScale, [128, 9, 4, 4, True, False]], #33
+    [[32,33], 1, Sum, []], #34
+    [28, 1, DAPPMProcess, [128, 3, 1, 1]], #35
+
+    [28, 1, DAPPMScale, [128, 17, 8, 8, True, False]], #36
+    [[35,36], 1, Sum, []], #37
+    [28, 1, DAPPMProcess, [128, 3, 1, 1]], #38
+
+    [28, 1, DAPPMScale, [128, None, None, None, True, True]], #39
+    [[38,39], 1, Sum, []], #40
+    [28, 1, DAPPMProcess, [128, 3, 1, 1]], #41
+
+    [[29, 32, 35, 38, 41], 1, Concat, [1]], #42
+    [42, 1, DAPPMProcess, [256, 1, 1, 0]], #43
+    [28, 1, DAPPMProcess, [256, 1, 1, 0]], #44
+    [[43,44], 1, Sum, []], #45
+    [-1, 1, Upsample, [256, 193]], #46
+
+    [[26, 46], 1, Sum, []], #47
+    [-1, 1, SegmentHead, [4, 128, 8]], #48
+    [13, 1, SegmentHead, [4, 128, 8]], #49
+    [[48,-1], 1, ToList, []] #50
+  ]

@@ -1,0 +1,48 @@
+project : test_project
+experiment_name : test
+df_path : ./filtered.csv
+img_path : /files/NIIAS/
+drop : ['folder_name', 'image_name','night','snow']
+drop_after : 'spring'
+savepath : ./seresnext50_32x4d_mt.pt
+
+dataset :
+  test_size : 0.2
+  img_size : 672
+  mean0: 0.485
+  mean1: 0.456
+  mean2: 0.406
+  std0: 0.229
+  std1: 0.224
+  std2: 0.225
+  split_type: stratified
+
+model :
+  name : seresnext50_32x4d
+  num_classes : 19
+  pretrained : True
+  model_type : Multitask
+  num_classes_mt : [2,3,2,12]
+
+train:
+  epochs: 100
+  loss_type : BCE
+  loss_type_mt : ['CE','CE','CE','BCE']
+  loss_type_calc : ['MC','MC','MC','ML']
+  loss_categories_mt : [['evening','daytime'],['winter','summer','autumn'],['straight','curve'],['human','arrows','traffic_light','fine', 'cloudy', 'rainy', 'sleet', 'hail', 'fog','sunlight','train','smoothed']]
+  loss_weights : [1,1,1,1]
+  optimizer : Adam
+  lr : 0.0003
+  momentum : 0.9
+  weight_decay : 0.00001
+  scheduler : StepLR
+  step_size : 30
+  gamma : 0.2
+  ema : False
+  ema_decay : 0.9998
+  accumulate_batch_size : 64
+
+validation:
+  metric : F1
+  calculation_type : by_class
+  sigmoid_treshold : 0.3

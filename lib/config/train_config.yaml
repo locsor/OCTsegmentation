@@ -1,0 +1,72 @@
+project : DDRNet
+experiment_name : wce23_slim
+img_path : '/data/cityscapes/leftImg8bit/train/'
+savepath : 'pretrained_models/ddrnet_model'
+resumepath: 'pretrained_models/ddrnet_model_5.pt' #'pretrained_models/ISW_240921/ddrnet_model_57.pt' 
+inference: False
+workers: 2
+validate: True
+robust: True
+
+dataset :
+  dataset: 'cityscapes'
+  root: './data/'
+  train_set: './data/train.csv'
+  test_set: './data/test.csv'
+  test_size : 0.2
+  img_size : [640, 960]
+  train_base_size: [896, 1344]
+  test_base_size: [640, 960]
+  train_num_samples: 0
+  test_num_samples: 0
+  mean0: 0.473
+  mean1: 0.482
+  mean2: 0.469
+  std0: 0.174
+  std1: 0.177
+  std2: 0.175
+  split_type: stratified
+  augment: True
+
+model :
+  name : ddrnet_23_slim
+  num_classes : 3
+  pretrained : True
+  model_type : MT #Segmentation
+  align_corners: false
+  num_outputs: 2
+
+train:
+  resume: False
+  epochs: 150
+  loss_type : Ohem
+  loss_ohemthres: 0.9
+  loss_ohemkeep: 131072
+  loss_balance_weights: [1, 0.4]
+  loss_type_mt : ['CE', 'Boundary']
+  loss_type_calc : ['MC','MC']
+  loss_weights : [0.7, 0.3]
+  optimizer : SGD
+  lr : 0.01
+  momentum : 0.9
+  weight_decay : 0.0001
+  scheduler : StepLR
+  step_size : 60
+  gamma : 0.1
+  accumulate_batch_size : 64
+  ema : True
+  ema_decay : 0.9998
+  shuffle: True
+  nesterov: False
+  multi_scale: True
+  flip: True
+  random_brightness: false
+  random_brightness_shift_value: 10
+  ignore_label: 255
+  downsamplerate: 1
+  scale_factor: 32
+
+validation:
+  metric : F1
+  calculation_type : by_class
+  sigmoid_treshold : 0.3
