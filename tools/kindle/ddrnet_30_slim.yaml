@@ -1,0 +1,74 @@
+input_channel: 3
+infrence_channels: 193
+
+depth_multiple: 1.0
+width_multiple: 1.0
+
+custom_module_paths: ["models.layers"]
+
+backbone:
+  [
+    [-1, 1, Input, [3, 32, True]], #0
+
+    [-1, 1, Layer, [32, 2, 1, 3, False, False, True]], #layer1 1
+
+    [-1, 1, Activation, [32]], #2
+    [-1, 1, Layer, [32, 2, 2, 3, False, False, True]], #layer2 3
+
+    [-1, 1, Activation, [64]], #4
+    [-1, 1, Layer, [128, 2, 2, 3, False, False, False]], #layer3_1 5
+
+    [3, 1, Activation, [64]], #6
+    [-1, 1, Layer, [64, 2, 1, 3, False, True, False]], #layer3_1_ 7
+
+    [-1, 1, Activation, [128]], #8
+    [-1, 1, Downsample, [128, 3, 2, 1, False]], #down3_1 9
+    [[5, -1], 1, Sum, [True, False]], #10
+
+    [5, 1, Activation, [128]], #11
+    [-1, 1, Compression, [64, 2]], #compression3_1 12
+    [[7, -1], 1, Sum, [True, False]], #13
+
+    #=============================================================#
+    [10, 1, Activation, [128]], #14
+    [-1, 1, Layer, [128, 2, 1, 3, False, False, False]], #layer3_2 15
+
+    [13, 1, Activation, [64]], #16
+    [-1, 1, Layer, [64, 2, 1, 3, False, True, False]], #layer3_2_ 17
+
+    [-1, 1, Activation, [64]], #18
+    [-1, 1, Downsample, [128, 3, 2, 1, False]], #down3_2 19
+    [[15, -1], 1, Sum, [True, False]], #20
+
+    [15, 1, Activation, [128]], #21
+    [-1, 1, Compression, [64, 2]], #compression3_2 22
+    [[17, -1, 7], 1, Sum, [True, False]], #23
+    #=============================================================#
+
+    [20, 1, Activation, [128]], #24
+    [-1, 1, Layer, [256, 2, 2, 3, False, False, False]], #layer4 25
+
+    [23, 1, Activation, [128]], #26
+    [-1, 1, Layer, [64, 2, 1, 3, False, False, False]], #layer4_ 27
+
+    [-1, 1, Activation, [128]], #28
+    [-1, 1, Downsample, [128, 3, 2, 1, True]], #down4 29
+    [[25, -1], 1, Sum, [True, False]], #30
+
+    [25, 1, Activation, [256]], #31
+    [-1, 1, Compression, [64, 4]], #compression4 32
+    [[27, -1, 17, 7], 1, Sum, [True, False]], #33
+
+    [-1, 1, Activation, [64]], #34
+    [-1, 1, Layer, [64, 1, 1, 3, True, False, False]], #layer5_ 35
+
+    [30, 1, Activation, [128]], #36
+    [-1, 1, Layer, [256, 1, 2, 3, True, False, False]], #layer5 37
+    [-1, 1, DAPPM, [128, 128]], # 38
+
+    [[35, -1, 27, 17, 7], 1, Sum, [True, True]], #39
+    [-1, 1, SegmentHead, [128, 3, 256, 8, True]], #40
+
+    [23, 1, SegmentHead, [64, 3, 256, 8, False]], #41
+    [[40, -1], 1, Covariance, [2]]
+  ]

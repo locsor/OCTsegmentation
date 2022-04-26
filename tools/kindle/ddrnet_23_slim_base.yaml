@@ -8,7 +8,7 @@ custom_module_paths: ["models.layers"]
 
 backbone:
   [
-    [-1, 1, Input, [3, True]], #0
+    [-1, 1, Input, [9, True]], #0
     [-1, 1, BasicBlock, [32, 2, 2, 1, False, False, False, 1, True, True]], #conv1 1
 
     [-1, 1, Layer, [32, 1, 2, 1, False, False, True]], #layer1 2

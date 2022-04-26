@@ -1,9 +1,3 @@
-# ------------------------------------------------------------------------------
-# Copyright (c) Microsoft
-# Licensed under the MIT License.
-# Written by Ke Sun (sunk@mail.ustc.edu.cn)
-# ------------------------------------------------------------------------------
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -125,20 +119,11 @@ def create_logger(cfg, cfg_name, phase='train'):
     return logger, str(final_output_dir), str(tensorboard_log_dir)
 
 def get_confusion_matrix(label, pred, size, num_class, ignore=-1):
-    """
-    Calcute the confusion matrix by given label and pred
-    """
-    output = pred.cpu().numpy().transpose(0, 2, 3, 1)
-    seg_pred = np.asarray(np.argmax(output, axis=3), dtype=np.uint8)
-    seg_gt = np.asarray(
-    label.cpu().numpy()[:, :size[-2], :size[-1]], dtype=np.int)
-    # print(np.unique(seg_pred), torch.unique(label))
 
-    ignore_index = seg_gt != ignore
-    seg_gt = seg_gt[ignore_index]
-    seg_pred = seg_pred[ignore_index]
+    output = torch.permute(pred, (0,2,3,1))
+    seg_pred = torch.argmax(output, dim=3)
 
-    index = (seg_gt * num_class + seg_pred).astype('int32')
+    index = (label * num_class + seg_pred).cpu().numpy().astype('int32').flatten()
     label_count = np.bincount(index)
     confusion_matrix = np.zeros((num_class, num_class))
 

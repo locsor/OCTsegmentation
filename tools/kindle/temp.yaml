@@ -6,124 +6,96 @@ width_multiple: 1.0
 
 custom_module_paths: [models.layers]
 
-backbone: [[-1, 1, Input, [3, true]],
-                               #0
- [-1, 1, BasicBlock, [32, 2, 2, 1, false, true, false, 1, true]],
-                                                                     #conv1 1
+backbone: [[-1, 1, Input, [3, 64, true]],
+                                   #0
 
- [-1, 1, Layer, [32, 2, 1, false, false, true]],
-                                                    #layer1 2
+[-1, 1, Layer, [64, 2, 1, 3, false, false, true]],
+  
+                                                       #layer1 1
 
- [-1, 1, Activation, []],
-                             #3
- [-1, 1, Layer, [64, 2, 2, false, false, true]],
-                                                    #layer2 4
+[-1, 1, Activation, [64]],
+                               #2
+[-1, 1, Layer, [64, 2, 2, 3, false, false, true]],
+                                                       #layer2 3
 
- [-1, 1, Activation, []],
-                             #5
- [-1, 1, Layer, [128, 2, 2, false, false, false]],
-                                                      #layer3 6
+[-1, 1,
+    Activation, [64]],
+                               #4
+[-1, 1, Layer, [256, 2, 2, 3, false, false, false]],
+                                                         #layer3_1 5
 
- [4, 1, Activation, []],
-                            #7
- [-1, 1, Layer, [64, 2, 1, false, true, true]],
-                                                   #layer3_ 8
+[3, 1, Activation, [
+      64]],
+                              #6
+[-1, 1, Layer, [128, 2, 1, 3, false, true, false]],
+                                                        #layer3_1_ 7
 
- [-1, 1, Activation, []],
-                             #9
- [-1, 1, Downsample, [128, 3, 2, 1]],
-                                         #down3 10
- [ [6, -1], 1, Sum, [true, false]],
-                                      #11
+[-1, 1, Activation, [
+      128]],
+                                #8
+[-1, 1, Downsample, [256, 3, 2, 1, false]],
+                                                #down3 9
+[[5, -1], 1, Sum, [true, false]],
+  
+                                      #10
 
- [6, 1, Activation, []],
-                            #12
- [-1, 1, Compression, [64, 2]],
-                                   #compression3 13
- [ [8, 13], 1, Sum, [true, false]],
-                                      #14
+[5, 1, Activation, [256]],
+                               #11
+[-1, 1, Compression, [128, 2]],
+                                    #compression3 12
+[[7, -1], 1, Sum, [true,
+      false]],
+                                      #13
 
- [11, 1, Activation, []],
-                             #15
- [-1, 1, Layer, [256, 2, 2, false, false, false]],
-                                                      #layer4 16
+[10, 1, Activation, [256]],
+                                #14
+[-1, 1, Layer, [512, 2, 2, 3, false, false, false]],
+  
+                                                         #layer4 15
 
- [14, 1, Activation, []],
-                             #17
- [-1, 1, Layer, [64, 2, 1, false, false, true]],
-                                                    #layer4_ 18
+[13, 1, Activation, [128]],
+                                #16
+[-1, 1, Layer, [128, 2, 1, 3, false, false, false]],
+  
+                                                         #layer4_ 17
 
- [-1, 1, Activation, []],
-                             #19
- [-1, 1, BasicBlock, [128, 2, 2, 1, false, false, false, 2, false]],
-                                                                        #down4 20
- [ [16, 20], 1, Sum, [true, false]],
-                                       #21
+[-1, 1, Activation, [128]],
+                                #18
+[-1, 1, Downsample, [256, 3, 2, 1, true]],
+                                               #down4 19
+[[15, -1],
+    1, Sum, [true, false]],
+                                       #20
 
- [16, 1, Activation, []],
-                             #22
- [-1, 1, Compression, [64, 4]],
-                                   #compression4 23
- [ [18, 23], 1, Sum, [true, false]],
-                                       #24
+[15, 1, Activation, [512]],
+                                #21
+[-1, 1, Compression, [128, 4]],
+  
+                                    #compression4 22
+[[17, -1], 1, Sum, [true, false]],
+                                       #23
 
- [-1, 1, Activation, []],
-                             #25
- [-1, 1, Layer, [64, 1, 1, true, false, true]],
-                                                   #layer5_ 26
+[-1, 1, Activation, [128]],
+                                #24
+[-1, 1, Layer, [128, 1,
+      1, 3, true, false, false]],
+                                                        #layer5_ 25
 
- [21, 1, Activation, []],
-                             #27
- [-1, 1, Layer, [256, 1, 2, true, false, false]],
-                                                     #layer5 28
- [-1, 1, DAPPM, [128, 128]],
-                                # 29
+[20, 1, Activation, [128]],
+                                #26
+[-1, 1, Layer, [512, 1, 2,
+      3, true, false, false]],
+                                                        #layer5 27
+[-1, 1, DAPPM, [256, 128, 8]],
+                                   # 28
 
- [ [26, 29], 1, Sum, [true, true]],
-                                      #30
- [-1, 1, SegmentHead, [128, 3, 64, 8]],
-                                           #31
+[[25, -1], 1, Sum, [true,
+      true]],
+                                      #29
+[-1, 1, SegmentHead, [256, 3, 128, 8, true]],
+                                                  #30
 
- [13, 1, SegmentHead, [64, 3, 64, 8]],
-                                          #32
-
- [ [31, -1], 1, Covariance, [2]]]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#DAPPM
-# [28, 1, DAPPMProcess, [128, 1, 1, 0]], #29
-
-# [28, 1, DAPPMScale, [128, 5, 2, 2, True, False]], #30
-# [[29,30], 1, Sum, []], #31
-# [28, 1, DAPPMProcess, [128, 3, 1, 1]], #32
-
-# [28, 1, DAPPMScale, [128, 9, 4, 4, True, False]], #33
-# [[32,33], 1, Sum, []], #34
-# [28, 1, DAPPMProcess, [128, 3, 1, 1]], #35
-
-# [28, 1, DAPPMScale, [128, 17, 8, 8, True, False]], #36
-# [[35,36], 1, Sum, []], #37
-# [28, 1, DAPPMProcess, [128, 3, 1, 1]], #38
-
-# [28, 1, DAPPMScale, [128, None, None, None, True, True]], #39
-# [[38,39], 1, Sum, []], #40
-# [28, 1, DAPPMProcess, [128, 3, 1, 1]], #41
-
-# [[29, 32, 35, 38, 41], 1, Concat, [1]], #42
-# [42, 1, DAPPMProcess, [256, 1, 1, 0]], #43
-# [28, 1, DAPPMProcess, [256, 1, 1, 0]], #44
-# [[43,44], 1, Sum, []], #45
-# [-1, 1, Upsample, [256, 32]], #46
+[12, 1, SegmentHead, [128, 3,
+      128, 8, false]],
+                                                   #31
+[[30, -1], 1, Covariance, [2]]]

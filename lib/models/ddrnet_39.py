@@ -153,7 +153,6 @@ class DAPPM(nn.Module):
 
     def forward(self, x):
 
-        #x = self.downsample(x)
         width = x.shape[-1]
         height = x.shape[-2]        
         x_list = []

@@ -23,30 +23,22 @@ def get_sampler(dataset):
     else:
         return None
 
-def get_dataset(experiment_dict, X, y, batch_size, world_size=1, rank=1, val=False, set_var=False):
+def get_dataset(experiment_dict, X, y, batch_size, world_size=1, workers=1, rank=1, val=False, set_var=False, cuda=True):
     data_dict = experiment_dict.copy()
     crop_size = (experiment_dict['dataset']['img_size'][0], experiment_dict['dataset']['img_size'][1])
-    base_size = data_dict['dataset']['train_base_size']
+    base_size = data_dict['dataset']['base_size']
 
     if val:
-        data_dict['train']['multi_scale'] = False
-        data_dict['train']['flip'] = False
-        data_dict['train']['downsamplerate'] = None
-        data_dict['train']['scale_factor'] = None
         data_dict['train']['shuffle'] = False
         data_dict['dataset']['train_num_samples'] = data_dict['dataset']['test_num_samples']
-        base_size = data_dict['dataset']['test_base_size']
+        base_size = data_dict['dataset']['base_size']
 
     dataset = Dataset(X, y,
                       num_samples = data_dict['dataset']['train_num_samples'],
                       num_classes = data_dict['model']['num_classes'],
-                      multi_scale = data_dict['train']['multi_scale'],
-                      flip = data_dict['train']['flip'],
                       ignore_label = data_dict['train']['ignore_label'],
                       base_size = base_size,
                       crop_size = crop_size,
-                      downsample_rate = data_dict['train']['downsamplerate'],
-                      scale_factor = data_dict['train']['scale_factor'],
                       mean = [data_dict['dataset']['mean0'],
                               data_dict['dataset']['mean1'],
                               data_dict['dataset']['mean2']],
@@ -56,7 +48,7 @@ def get_dataset(experiment_dict, X, y, batch_size, world_size=1, rank=1, val=Fal
                       val = val,
                       set_var = set_var)
 
-    nw = min([os.cpu_count() // world_size, batch_size if batch_size > 1 else 0, experiment_dict['workers']])  # number of workers
+    nw = min([os.cpu_count() // world_size, batch_size if batch_size > 1 else 0, workers])  # number of workers
     sampler = get_sampler(dataset)
     dataloader = torch.utils.data.DataLoader(
         dataset,
@@ -75,13 +67,10 @@ class Dataset():
                  filenames_mask,
                  num_samples=None,
                  num_classes=4,
-                 multi_scale=True,
-                 flip=True,
                  ignore_label=255,
                  base_size=[2048,2048],
                  crop_size=(512, 1024),
                  downsample_rate=1,
-                 scale_factor=16,
                  mean=[0.485, 0.456, 0.406],
                  std=[0.229, 0.224, 0.225],
                  test=False,
@@ -91,10 +80,7 @@ class Dataset():
         self.filenames_img = filenames_img
         self.filenames_mask = filenames_mask
         self.num_classes = num_classes
-        self.multi_scale = multi_scale
-        self.flip = flip
         self.test = test
-        self.scale_factor = scale_factor
         self.base_size = base_size
         self.crop_size = crop_size
         self.ignore_label = ignore_label
@@ -113,14 +99,19 @@ class Dataset():
 
     def transform(self, sample, train):
         transform = A.Compose([A.Normalize(self.mean, self.std),
+                               A.Resize(height=self.crop_size[0],width=self.crop_size[1]),
                                ToTensorV2()])
 
         if train:
-            transform = A.Compose([A.Flip(p=0.5),
-                                   A.OneOf([
-                                   A.RandomCrop(int(self.base_size[0]*0.5), int(self.base_size[1]*0.5), p=1),
-                                   A.RandomCrop(int(self.base_size[0]*0.75), int(self.base_size[1]*0.75), p=1),
-                                   A.RandomCrop(int(self.base_size[0]*0.8), int(self.base_size[1]*0.8), p=1)], p=0.9),
+
+            transform = A.Compose([A.HorizontalFlip(p=0.5),
+                                   A.RandomGamma(gamma_limit=(32, 96), p=0.5),
+                                   A.RandomBrightnessContrast(p=0.5),
+                                   A.HueSaturationValue(p=0.5),
+                                   A.OneOf([A.MotionBlur(blur_limit=25, p=1),
+                                            A.Blur(blur_limit=25, p=1)], p=0.2),
+                                   A.RandomScale(scale_limit=(-0.5, -0.2), p=0.5, interpolation=1),
+                                   A.PadIfNeeded(self.base_size[0], self.base_size[1], border_mode=cv2.BORDER_CONSTANT),
                                    A.Resize(height=self.crop_size[0],width=self.crop_size[1]),
                                    A.Normalize(self.mean, self.std),
                                    ToTensorV2()])
@@ -132,14 +123,18 @@ class Dataset():
         item = self.filenames_img[index]
         image = cv2.imread(item, cv2.IMREAD_COLOR)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        label = cv2.imread(self.filenames_mask[index], cv2.IMREAD_GRAYSCALE)
-
-        sample={"image":image,"mask":label}
+        label = cv2.imread(self.filenames_mask[index], 0)
+        if np.max(np.unique(label)) in [4,5]:
+            label[label==5] = 4 #main rail
+            label[label==2] = 3 #wagon directly in front
+            label[label==4] = 2 #periphery rail
+        sample={"image":image.copy(),"mask":label}
 
         if self.test or (self.val and not self.set_var):
+            # image = cv2.resize(image, (960, 640))
             sample=self.transform(sample,False)
 
-            return sample['image'], sample['mask'], np.array(self.base_size), item
+            return sample['image'], sample['mask'], item#image[:,:,::-1].copy()
 
         elif self.set_var:
             image_orig = image.copy()

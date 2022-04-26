@@ -62,7 +62,7 @@ class CovMatrix_ISW:
             num_sensitive = self.num_off_diagonal - self.margin
             print("num_sensitive = ", num_sensitive)
             _, indices = torch.topk(var_flatten, k=int(num_sensitive))
-        mask_matrix = torch.flatten(torch.zeros(self.dim, self.dim).cuda())
+        mask_matrix = torch.flatten(torch.zeros(self.dim, self.dim)).cuda()
         mask_matrix[indices] = 1
 
         if self.mask_matrix is not None:

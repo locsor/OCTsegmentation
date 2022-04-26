@@ -5,7 +5,7 @@ import pathlib
 import _init_paths as _init_paths
 import ruamel.yaml
 import argparse
-import os
+import os, ast
 import operator
 import sys, time
 import logging, random, csv
@@ -32,59 +32,35 @@ def resume(model, path):
 
     return model, optimizer, scheduler, start_epoch
 
-# def get_x_y(filename):
-#     img_files = []
-#     mask_files = []
+def get_x_y(folder):
+    frames = []
+    masks = []
 
-#     filenames = []
-#     with open(filename, newline='') as f:
-#         reader = csv.reader(f)
-#         filenames = list(reader)
-#         filenames = [item for sublist in filenames for item in sublist]
-#         file_nums = []
-#         print(filenames[:100])
-#         for i in range(len(filenames)):
-#             if filenames[i][-13:-10].isdigit():
-#                 file_nums.append(int(filenames[i][-13:-10]))
-#             elif filenames[i][-12:-10].isdigit():
-#                 file_nums.append(int(filenames[i][-12:-10]))
-#             elif filenames[i][-11:-10].isdigit():
-#                 file_nums.append(int(filenames[i][-11:-10]))
-
-#         file_idx = list(range(len(file_nums)))
-#         file_nums, file_idx = zip(*sorted(zip(file_nums, file_idx)))
-
-#     for idx in file_idx:
-#         file = filenames[idx]#[0]
-#         img_files.append(file)
-#         mask_name = file.replace('/img/', '/masks/')
-#         # mask_name = file.replace('_frame', '_mask')
-#         mask_files.append(mask_name)
-
-#     return np.asarray(img_files), np.asarray(mask_files)
-
-def get_x_y(filename):
-    img_files = []
-    mask_files = []
-
-    filenames = []
-    with open(filename, newline='') as f:
-        reader = csv.reader(f)
-        filenames = list(reader)
-
-    for i in range(len(filenames)):
-        file = filenames[i][0]
-        img_files.append('./data/' + file)
-        mask_name = file.replace('/img/', '/masks/')
-        mask_files.append('./data/' + mask_name)
-
-    return np.asarray(img_files), np.asarray(mask_files)
+    for _, dirs, _ in os.walk(folder):
+        for directory in dirs:
+            frames_dir = []
+            frames_dir_num = []
+            for _, _, file in os.walk(folder + '/' + directory):
+                for name in file:
+                    if name.endswith('_frame.png'):
+                        frames_dir += [folder + '/' + directory + '/' + name]
+                        frames_dir_num += [int(name[:-10])]
+                        
+            frames_dir_num, frames_dir = zip(*sorted(zip(frames_dir_num, frames_dir)))
+            frames += list(frames_dir)
+            
+    masks = [file.replace('frame', 'mask') for file in frames]
+    return frames, masks
 
 def transform(sample):
-    mean = [0.473, 0.482, 0.469]
-    std = [0.174, 0.177, 0.175]
+    mean = [0.485, 0.456, 0.406]
+    std = [0.229, 0.224, 0.225]
     base_size = (640, 960)
 
+    crop_x1 = random.randint(0,300)
+    crop_x2 = random.randint(0,300)
+    crop_y1 = random.randint(0,200)
+    crop_y2 = random.randint(0,200)
     transform = A.Compose([A.Resize(height=base_size[0],width=base_size[1]),
                            A.Normalize(mean, std),
                            ToTensorV2()])
@@ -92,95 +68,51 @@ def transform(sample):
     sample = transform(image=sample['image'], mask=sample['mask'])
     return sample
 
-def inference(model, device):
+def inference(model, device, folder, output):
     model.eval()
-    img_size = (960, 640)
-    # folder = [x[0] for x in os.walk('./data/logs/') if 'out' not in x[0] and '_' in x[0]]
-    folder = ['./data/test']
+    img_size = experiment_dict['dataset']['img_size_test']
 
     bIoU_arr = []
     acc_arr = []
     confusion_matrix = np.zeros((3, 3, 1))
 
     with torch.no_grad():
-        for f in folder:
-            print(f)
-            imgs, labels = get_x_y(f+'.csv')
-            imgs = imgs[:256]
-            lables = labels[:256]
+        imgs, labels = get_x_y(folder)
 
-            for i in tqdm(range(len(imgs))):
-                # imgs[i] = '.' + imgs[i][1:]
-                # labels[i] = '.' + labels[i][1:]
-                img_name = imgs[i][2:]
-                lable_name = labels[i][2:]
+        for i in tqdm(range(len(imgs))):
+            img_name = imgs[i]
+            lable_name = labels[i]
 
-                img = cv2.imread(img_name, cv2.IMREAD_COLOR)
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                label = cv2.imread(lable_name, 0)
-                label[label >= 1] -= 1
-                # img_gray = cv2.imread(img_name, 0)
+            img = cv2.imread(img_name, cv2.IMREAD_COLOR)
+            img_reg = img.copy()
+            img_reg = cv2.resize(img_reg, (960,640))
+            img[img == 0] = 255
+            label = cv2.imread(lable_name)[:,:,0]
 
-                # img_gray[img_gray>0] = 1
-                # img_shape = img_gray.shape
-                # y1 = list(img_gray[256,:]).index(1)
-                # y2 = img_shape[1] - list(img_gray[256,:])[::-1].index(1)
-                # x1 = list(img_gray[:,400]).index(1)
-                # x2 = img_shape[0] - list(img_gray[:,400])[::-1].index(1)
-                # if x1 != 0:
-                #     continue
-                    # img = img[x1:x2, y1:y2]
-                    # img = img[:,:,::-1]
-                    # label = label[x1:x2, y1:y2]
+            sample={"image":img,"mask":label}
+            sample = transform(sample)
+            size = sample['mask'].size()
 
-                # img = cv2.resize(img, img_size)
-                # label = cv2.resize(label, img_size)
-                # img = center_crop(img, img_size)
-                # label = center_crop(label, img_size)
-                # size = label.shape
+            result = model(torch.unsqueeze(sample['image'], dim=0).to(device))
 
-                # img_reg = img.copy()
-                # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                # img = input_transform(img).to(device)
+            result = torch.softmax(result[0][0], dim=1)
+            _, result = torch.max(result, dim=1)
 
-                sample={"image":img,"mask":label}
-                sample = transform(sample)
-                size = sample['mask'].size()
+            out = np.uint8(F.one_hot(result, num_classes=3).cpu().numpy()[0] * 255)
+            out[...,0] = 0
 
-                result = model(torch.unsqueeze(sample['image'], dim=0).to(device))
+            out = cv2.addWeighted(img_reg,0.7,out,0.3,0)
 
-                result = torch.softmax(result[0][0], dim=1)
-                # label = torch.unsqueeze(torch.from_numpy(label), dim = 0)
+            # folder = img_name.split('/')[3]
+            # if os.path.isdir(output + folder) is False:
+                # os.mkdir(output + folder)
+            # img_name = img_name.replace(folder, output)
+            img_name = output + str(i) + '.png'
+            cv2.imwrite(img_name, out)
 
-                # confusion_matrix = get_confusion_matrix(label,
-                #                     result,
-                #                     size,
-                #                     3,
-                #                     255)
-
-                # pos = confusion_matrix.sum(1)
-                # res = confusion_matrix.sum(0)
-                # tp = np.diag(confusion_matrix)
-                # IoU_array = (tp / np.maximum(1.0, pos + res - tp))
-
-#                print(metrics.boundary_iou(torch.unsqueeze(sample['mask'], dim=0), result))
-                _, result = torch.max(result, dim=1)
-
-                out = np.uint8(F.one_hot(result, num_classes=3).cpu().numpy()[0] * 255)
-                #label = np.uint8(np.eye(3)[label[0]]) * 127
-                out[...,0] = 0
-                #label[...,0] = 0
-
-                # result = cv2.resize(result, img.shape[:2][::-1], interpolation = cv2.INTER_NEAREST)
-                out = cv2.addWeighted(img,0.7,out,0.3,0)
-                # out = cv2.addWeighted(out,0.7,label,0.3,0)
-
-                cv2.imwrite('./output/test/' + str(i) + '.png', out)
-                # cv2.imwrite(f + '_out/' + str(i) + '.png', out)
-
-def call_inference(experiment_dict, model, device):
+def call_inference(experiment_dict, model, folder, output, device):
     model,_,_,_ = resume(model, experiment_dict['resumepath'])
-    inference(model, device)
+    inference(model, device, folder, output)
 
 
 if __name__ == '__main__':
@@ -189,10 +121,14 @@ if __name__ == '__main__':
     parser.add_argument('--hyp', type=str, default='./lib/config/train_config.yaml',
                         help='hyperparameters path')
     parser.add_argument('--device', default='0', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--folder', help='folder with image')
+    parser.add_argument('--output', help='folder to write image into')
     parser.add_argument('--local_rank', type=int, default=-1, help='DDP parameter, do not modify')
 
     opt = parser.parse_args()
     device = select_device(opt.device)
+    folder = opt.folder
+    output = opt.output
     rank = int(os.environ['RANK']) if 'RANK' in os.environ else -1
 
     cuda = device.type != 'cpu'
@@ -201,7 +137,7 @@ if __name__ == '__main__':
         experiment_dict = yaml.load(f, Loader=yaml.FullLoader)
 
     yaml_ruamel = ruamel.yaml.YAML()
-    with open("./tools/kindle/ddrnet_23_slim.yaml") as fp:
+    with open("./tools/kindle/ddrnet_23.yaml") as fp:
         data = yaml_ruamel.load(fp)
 
     with open("./tools/kindle/temp.yaml", 'w') as yaml_file:
@@ -212,4 +148,4 @@ if __name__ == '__main__':
 
     metrics = metrics.Metrics_factory()
 
-    call_inference(experiment_dict, model, device)
+    call_inference(experiment_dict, model, folder, output, device)
